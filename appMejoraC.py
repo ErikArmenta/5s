@@ -12,6 +12,10 @@ import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
 import io
+# Importamos la herramienta de refresco
+from streamlit_autorefresh import st_autorefresh
+
+
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -21,7 +25,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-@st.cache_data
+# REFRESH AUTOMÁTICO: Cada 60,000 milisegundos (1 minuto)
+# Esto hará que el Command Center busque datos nuevos en Google Sheets solito
+st_autorefresh(interval=60 * 1000, key="data_refresh")
+
+
+
+@st.cache_data(ttl=60) # El caché ahora solo dura 60 segundos
 def load_data():
     sheet_id = "1fQknMt1KB98suoWzOedT87RMC6O_3uuCcUBiv3NOQgo"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
@@ -217,4 +227,5 @@ try:
         st.dataframe(df_visualizacion, use_container_width=True)
 
 except Exception as e:
+
     st.error(f"Error de sistema: {e}")
