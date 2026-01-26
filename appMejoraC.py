@@ -96,33 +96,51 @@ try:
     lider_nombre = ranking_general.idxmax() if not ranking_general.empty else "N/A"
     c3.metric("Líder de Planta", lider_nombre)
 
-    # --- RADAR CON SEMÁFORO ---
+# --- RADAR CON SEMÁFORO Y HOVERS ENRIQUECIDOS (APP) ---
     st.subheader("📊 Comparativo de Madurez por Área")
     fig_radar = go.Figure()
     areas_activas = df_filtered['Area'].unique()
 
     for area in areas_activas:
         df_area = df_filtered[df_filtered['Area'] == area]
+        # Cálculo de promedios por cada S
         r_vals = [round(df_area[cols].mean(axis=1, numeric_only=True).mean(), 2) for cols in etapas_dict.values()]
         r_vals = [v if not np.isnan(v) else 0 for v in r_vals]
-        avg_area = sum(r_vals)/5
+        avg_area = round(sum(r_vals)/5, 2) # Promedio general del área
 
         # Lógica de Color Semáforo
         color_linea = "#ff4b4b" if avg_area < 3 else ("#FFFF00" if avg_area < 4.2 else "#00FF00")
 
-        r_vals.append(r_vals[0])
+        # Cerrar el ciclo del radar
+        r_vals_ciclo = r_vals + [r_vals[0]]
         theta_vals = list(etapas_dict.keys()) + [list(etapas_dict.keys())[0]]
 
         fig_radar.add_trace(go.Scatterpolar(
-            r=r_vals, theta=theta_vals, name=f"{area} ({round(avg_area,2)})",
+            r=r_vals_ciclo,
+            theta=theta_vals,
+            name=f"{area} ({avg_area})",
             line=dict(color=color_linea, width=3),
             fill='toself',
             marker=dict(size=8),
-            hovertemplate=f"<b>{area}</b><br>Score: %{{r}}<extra></extra>"
+            # HOVER ENRIQUECIDO REPLICADO DEL REPORTE
+            hovertemplate=(
+                f"<b>Área: {area}</b><br>" +
+                "Etapa: %{theta}<br>" +
+                "Calificación: %{r}<br>" +
+                f"Promedio General: {avg_area}<extra></extra>"
+            )
         ))
 
-    fig_radar.update_layout(template="plotly_dark", polar=dict(radialaxis=dict(range=[0,5])))
+    fig_radar.update_layout(
+        template="plotly_dark",
+        polar=dict(
+            radialaxis=dict(range=[0,5], visible=True, gridcolor="gray"),
+            angularaxis=dict(gridcolor="gray")
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.1, xanchor="center", x=0.5)
+    )
     st.plotly_chart(fig_radar, use_container_width=True)
+
 
     # --- ALTAIR CORREGIDO ---
     st.subheader("📈 Promedio General por Etapa")
@@ -309,3 +327,4 @@ try:
 
 except Exception as e:
     st.error(f"Error de sistema: {e}")
+
