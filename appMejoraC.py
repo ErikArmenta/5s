@@ -72,6 +72,7 @@ try:
     # --- CÁLCULOS RESUMEN ---
     resumen_data = []
     etapas_dict = {"SEIRI": cols_1s, "SEITON": cols_2s, "SEISO": cols_3s, "SEIKETSU": cols_4s, "SHITSUKE": cols_5s}
+    etapas_nombres = list(etapas_dict.keys())
 
     for etapa, columnas in etapas_dict.items():
         avg_etapa = df_filtered[columnas].mean(axis=1, numeric_only=True).mean()
@@ -87,16 +88,25 @@ try:
     resumen_data.append({"Etapa": "TOTAL", "Puntaje": round(score_global, 2), "Mejor Área": "N/A"})
     resumen = pd.DataFrame(resumen_data)
 
+    # --- NUEVO: Calificaciones por Área (para el gráfico de barras) ---
+    # Calcular el promedio total de las 5S por cada área
+    ranking_general = df_filtered.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1).sort_values(ascending=False)
+    ranking_df = ranking_general.reset_index()
+    ranking_df.columns = ['Area', 'Calificación Total 5S']
+
+    # Identificar la barra con mayor calificación
+    max_score = ranking_df['Calificación Total 5S'].max()
+    ranking_df['Es_Máximo'] = ranking_df['Calificación Total 5S'] == max_score
+
     st.title("🏭🎛️ 5S Operations Command Center")
     c1, c2, c3 = st.columns(3)
     c1.metric("Auditorías", len(df_filtered))
     c2.metric("Score Global", f"{score_global:.2f}")
 
-    ranking_general = df_filtered.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1)
     lider_nombre = ranking_general.idxmax() if not ranking_general.empty else "N/A"
     c3.metric("Líder de Planta", lider_nombre)
 
-# --- RADAR CON SEMÁFORO Y HOVERS ENRIQUECIDOS (APP) ---
+    # --- RADAR SIN SOMBRA CON LÍNEAS Y ÁREA MÁS GRANDE ---
     st.subheader("📊 Comparativo de Madurez por Área")
     fig_radar = go.Figure()
     areas_activas = df_filtered['Area'].unique()
@@ -108,21 +118,26 @@ try:
         r_vals = [v if not np.isnan(v) else 0 for v in r_vals]
         avg_area = round(sum(r_vals)/5, 2) # Promedio general del área
 
-        # Lógica de Color Semáforo
-        color_linea = "#ff4b4b" if avg_area < 3 else ("#FFFF00" if avg_area < 4.2 else "#00FF00")
+        # Lógica de Color Semáforo: >=4 verde, >=3 amarillo, <3 rojo
+        if avg_area >= 4:
+            color_linea = "#00FF00"  # Verde
+        elif avg_area >= 3:
+            color_linea = "#FFFF00"  # Amarillo
+        else:
+            color_linea = "#ff4b4b"  # Rojo
 
         # Cerrar el ciclo del radar
         r_vals_ciclo = r_vals + [r_vals[0]]
-        theta_vals = list(etapas_dict.keys()) + [list(etapas_dict.keys())[0]]
+        theta_vals = etapas_nombres + [etapas_nombres[0]]
 
         fig_radar.add_trace(go.Scatterpolar(
             r=r_vals_ciclo,
             theta=theta_vals,
             name=f"{area} ({avg_area})",
             line=dict(color=color_linea, width=3),
-            fill='toself',
-            marker=dict(size=8),
-            # HOVER ENRIQUECIDO REPLICADO DEL REPORTE
+            fill='none',  # Sin sombra, solo líneas
+            marker=dict(size=6, color=color_linea),
+            # HOVER ENRIQUECIDO
             hovertemplate=(
                 f"<b>Área: {area}</b><br>" +
                 "Etapa: %{theta}<br>" +
@@ -134,85 +149,221 @@ try:
     fig_radar.update_layout(
         template="plotly_dark",
         polar=dict(
-            radialaxis=dict(range=[0,5], visible=True, gridcolor="gray"),
-            angularaxis=dict(gridcolor="gray")
+            radialaxis=dict(
+                range=[0,5],
+                visible=True,
+                gridcolor="gray",
+                tickfont=dict(color="white", size=12),
+                title=dict(text="Calificación", font=dict(color="white"))
+            ),
+            angularaxis=dict(
+                gridcolor="gray",
+                tickfont=dict(color="white", size=12),  # Letras de las etapas
+                tickvals=etapas_nombres,
+                ticktext=[f"{etapa}<br><span style='font-size:14px; font-weight:bold;'>{area[:15]}</span>" for etapa in etapas_nombres]  # Área más grande
+            )
         ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.1, xanchor="center", x=0.5)
+        legend=dict(orientation="h", yanchor="bottom", y=1.1, xanchor="center", x=0.5, font=dict(color="white"))
     )
     st.plotly_chart(fig_radar, use_container_width=True)
 
+    # --- GRÁFICO DE BARRAS MEJORADO: Calificación Total por Área ---
+    st.subheader("📈 Calificación Total 5S por Área")
 
-    # --- ALTAIR CORREGIDO ---
-    st.subheader("📈 Promedio General por Etapa")
-    bars = alt.Chart(resumen).mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8, stroke="#00FFFF").encode(
-        x=alt.X('Etapa:N', sort=None, axis=alt.Axis(labelColor='white')),
-        y=alt.Y('Puntaje:Q', scale=alt.Scale(domain=[0, 5]), axis=alt.Axis(labelColor='white')),
-        color=alt.condition(alt.datum.Etapa == 'TOTAL', alt.value('#00FFFF'), alt.value('#1f77b4')),
-        tooltip=['Etapa', 'Puntaje', 'Mejor Área']
+    # Crear gráfico de barras con Altair
+    bars = alt.Chart(ranking_df).mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8).encode(
+        x=alt.X('Area:N',
+                sort=None,
+                axis=alt.Axis(labelColor='white', labelAngle=-45, title='Área')),
+        y=alt.Y('Calificación Total 5S:Q',
+                scale=alt.Scale(domain=[0, 5]),
+                axis=alt.Axis(labelColor='white', title='Calificación Total (0-5)')),
+        color=alt.condition(
+            alt.datum.Es_Máximo,
+            alt.value('#00FF00'),  # Verde para la barra más alta
+            alt.value('#1f77b4')   # Azul para las demás
+        ),
+        tooltip=['Area', 'Calificación Total 5S']
     ).properties(height=400)
-    st.altair_chart(bars, use_container_width=True)
 
-# --- REPORTE HTML ACTUALIZADO (CON ÁREAS Y HOVERS DETALLADOS) ---
-    def generate_html_report(df_resumen, df_audit):
+    # Agregar etiquetas con el valor encima de cada barra
+    text = bars.mark_text(
+        align='center',
+        baseline='bottom',
+        dy=-5,
+        color='white',
+        fontSize=12,
+        fontWeight='bold'
+    ).encode(
+        text=alt.Text('Calificación Total 5S:Q', format='.2f')
+    )
+
+    final_chart = bars + text
+    st.altair_chart(final_chart, use_container_width=True)
+
+    # --- REPORTE HTML ACTUALIZADO (CON RADAR POR PLANTA Y COMENTARIOS CON ANIMACIÓN) ---
+    def generate_html_report(df_resumen, df_audit, ranking_df_area):
+        # Calcular ranking por planta (si existe columna Planta, si no usar Area)
+        if 'Planta' in df_audit.columns:
+            ranking_planta = df_audit.groupby('Planta')[all_eval_cols].mean(numeric_only=True).mean(axis=1).dropna()
+            planta_critica = ranking_planta.idxmin() if not ranking_planta.empty else "N/A"
+            planta_lider = ranking_planta.idxmax() if not ranking_planta.empty else "N/A"
+            score_critico_planta = round(ranking_planta.min(), 2) if not ranking_planta.empty else 0
+        else:
+            # Si no hay columna Planta, usar Area como fallback
+            ranking_planta = df_audit.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1).dropna()
+            planta_critica = ranking_planta.idxmin() if not ranking_planta.empty else "N/A"
+            planta_lider = ranking_planta.idxmax() if not ranking_planta.empty else "N/A"
+            score_critico_planta = round(ranking_planta.min(), 2) if not ranking_planta.empty else 0
+
+        # Calcular ranking por área para el resto del reporte
         ranking_total = df_audit.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1).dropna()
         area_critica = ranking_total.idxmin() if not ranking_total.empty else "N/A"
         area_lider_rep = ranking_total.idxmax() if not ranking_total.empty else "N/A"
-        score_critico = round(ranking_total.min(), 2) if not ranking_total.empty else 0
+        score_critico_area = round(ranking_total.min(), 2) if not ranking_total.empty else 0
         auditor_lider_rep = df_audit['Nombre del Auditor'].mode()[0] if not df_audit.empty else "N/A"
 
-        # 1. Preparar Datos para Radar Animado con Hovers Mejorados
-        etapas_nombres = ["SEIRI", "SEITON", "SEISO", "SEIKETSU", "SHITSUKE"]
+        # 1. Preparar Datos para Radar por PLANTA (sin sombra, solo líneas)
         etapas_ciclo = etapas_nombres + [etapas_nombres[0]]
 
+        # Obtener plantas únicas
+        if 'Planta' in df_audit.columns:
+            plantas_unicas = df_audit['Planta'].unique()
+        else:
+            plantas_unicas = df_audit['Area'].unique()
+
         fig_anim = go.Figure()
-        for area in df_audit['Area'].unique():
-            df_a = df_audit[df_audit['Area'] == area]
-            r_v = [round(df_a[cols].mean(axis=1, numeric_only=True).mean(), 2) for cols in etapas_dict.values()]
+        for planta in plantas_unicas:
+            if 'Planta' in df_audit.columns:
+                df_p = df_audit[df_audit['Planta'] == planta]
+            else:
+                df_p = df_audit[df_audit['Area'] == planta]
+
+            r_v = [round(df_p[cols].mean(axis=1, numeric_only=True).mean(), 2) for cols in etapas_dict.values()]
             r_v = [v if not np.isnan(v) else 0 for v in r_v]
-            avg_a = round(sum(r_v)/5, 2)
-            color_radar = "#ff4b4b" if avg_a < 3 else ("#FFFF00" if avg_a < 4.2 else "#00FF00")
+            avg_planta = round(sum(r_v)/5, 2)
+
+            # Lógica de color: >=4 verde, >=3 amarillo, <3 rojo
+            if avg_planta >= 4:
+                color_linea = "#00FF00"
+            elif avg_planta >= 3:
+                color_linea = "#FFFF00"
+            else:
+                color_linea = "#ff4b4b"
+
             r_v.append(r_v[0])
 
             fig_anim.add_trace(go.Scatterpolar(
                 r=r_v,
                 theta=etapas_ciclo,
-                name=area,
-                line=dict(color=color_radar, width=3),
-                fill='toself',
-                # HOVER PERSONALIZADO: Muestra Área, Etapa, Calificación y Promedio General
+                name=planta,
+                line=dict(color=color_linea, width=3),
+                fill='none',  # Sin sombra, solo líneas
+                marker=dict(size=6, color=color_linea),
+                # HOVER PERSONALIZADO
                 hovertemplate=(
-                    f"<b>Área: {area}</b><br>" +
+                    f"<b>Planta: {planta}</b><br>" +
                     "Etapa: %{theta}<br>" +
                     "Calificación: %{r}<br>" +
-                    f"Promedio General: {avg_a}<extra></extra>"
+                    f"Promedio General: {avg_planta}<extra></extra>"
                 )
             ))
 
         fig_anim.update_layout(
             template="plotly_dark",
-            polar=dict(bgcolor="rgba(0,0,0,0)", radialaxis=dict(range=[0,5], visible=True)),
+            polar=dict(
+                bgcolor="rgba(0,0,0,0)",
+                radialaxis=dict(
+                    range=[0,5],
+                    visible=True,
+                    tickfont=dict(color="white", size=12)
+                ),
+                angularaxis=dict(
+                    tickfont=dict(color="white", size=14, weight='bold'),  # Letras de etapas más grandes
+                    tickvals=etapas_nombres,
+                    ticktext=[f"{etapa}<br><span style='font-size:16px; font-weight:bold;'>{planta[:20]}</span>" for etapa in etapas_nombres]
+                )
+            ),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(t=30, b=30, l=30, r=30)
         )
 
+        # Agregar título dinámico al radar
         radar_div = fig_anim.to_html(full_html=False, include_plotlyjs='cdn')
 
-        # 2. Filas de Bitácora con Parpadeo
-        filas_html = ""
-        for _, row in df_audit.iterrows():
-            es_critico = str(row['Area']) == str(area_critica)
-            clase_anim = 'class="row-critical-blink"' if es_critico else ''
-            puntos_abiertos = row.get('Comentarios / Observaciones', 'Sin observaciones')
-            filas_html += f"""<tr {clase_anim}>
-                <td>{row['Marca temporal']}</td><td>{row['Area']}</td><td>{row['Maquina']}</td><td>{row['Nombre del Auditor']}</td><td>{puntos_abiertos}</td>
-            </tr>"""
+        # 2. Preparar gráfico de barras para el reporte HTML
+        ranking_df_area['Es_Maximo'] = ranking_df_area['Calificación Total 5S'] == ranking_df_area['Calificación Total 5S'].max()
 
-        # 3. Resumen de Calificaciones incluyendo Mejor Área
-        resumen_filas = "".join([
-            f"<tr><td>{r['Etapa']}</td><td>{r['Puntaje']}</td><td style='color:#00ffff'>{r['Mejor Área']}</td></tr>"
-            for _, r in df_resumen.iterrows()
-        ])
+        fig_barras = go.Figure()
+        fig_barras.add_trace(go.Bar(
+            x=ranking_df_area['Area'],
+            y=ranking_df_area['Calificación Total 5S'],
+            marker_color=['#00FF00' if es_max else '#1f77b4' for es_max in ranking_df_area['Es_Maximo']],
+            text=ranking_df_area['Calificación Total 5S'].round(2),
+            textposition='outside',
+            textfont=dict(color='white', size=12),
+            hovertemplate='Área: %{x}<br>Calificación Total: %{y}<extra></extra>'
+        ))
+
+        fig_barras.update_layout(
+            title="Calificación Total 5S por Área",
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(title="Calificación Total (0-5)", range=[0, 5], gridcolor="gray", tickfont=dict(color="white")),
+            xaxis=dict(title="Área", tickfont=dict(color="white"), tickangle=-45),
+            height=500,
+            margin=dict(t=50, b=100, l=50, r=50)
+        )
+
+        barras_div = fig_barras.to_html(full_html=False, include_plotlyjs='cdn')
+
+        # 3. Preparar comentarios por área con animación para áreas críticas
+        # Identificar columnas de comentarios
+        cols_comentarios = [c for c in df_audit.columns if 'Comentario' in c or 'Comentarios' in c]
+
+        # Crear diccionario de comentarios por área
+        comentarios_por_area = {}
+        for _, row in df_audit.iterrows():
+            area = row['Area']
+            comentarios = []
+            for col in cols_comentarios:
+                if pd.notna(row[col]) and str(row[col]).strip() != '':
+                    comentarios.append(f"• {col.replace('Comentario', '').replace('Comentarios', '').replace('_', ' ')}: {row[col]}")
+            if comentarios:
+                if area not in comentarios_por_area:
+                    comentarios_por_area[area] = []
+                comentarios_por_area[area].extend(comentarios)
+
+        # Generar filas de comentarios por área con animación para áreas críticas
+        comentarios_html = ""
+        for area, comentarios_lista in comentarios_por_area.items():
+            comentarios_unicos = list(set(comentarios_lista))
+            comentarios_texto = "<br>".join(comentarios_unicos) if comentarios_unicos else "Sin comentarios"
+            # Verificar si esta área es crítica (está en el top de peores)
+            es_critico = area == area_critica
+            clase_anim = 'class="row-critical-blink"' if es_critico else ''
+            comentarios_html += f"""
+            <tr {clase_anim}>
+                <td style="padding: 12px; border-bottom: 1px solid #333; font-weight: bold;">{area}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #333;">{comentarios_texto}</td>
+            </tr>
+            """
+
+        # 4. Preparar tabla de calificaciones por área
+        tabla_calificaciones = ranking_df_area.copy()
+        tabla_calificaciones_html = ""
+        for _, row in tabla_calificaciones.iterrows():
+            es_critico = row['Area'] == area_critica
+            clase_anim = 'class="row-critical-blink"' if es_critico else ''
+            tabla_calificaciones_html += f"""
+            <tr {clase_anim}>
+                <td style="padding: 12px; border-bottom: 1px solid #333; font-weight: bold;">{row['Area']}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #333;">{row['Calificación Total 5S']:.2f}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #333; color: #00ffff;">{area_lider_rep if row['Calificación Total 5S'] == tabla_calificaciones['Calificación Total 5S'].max() else '-'}</td>
+            </tr>
+            """
 
         return f"""
         <html>
@@ -236,13 +387,13 @@ try:
                     padding: 40px;
                     text-align: center;
                 }}
-                .insight-grid {{ display: flex; justify-content: center; gap: 20px; margin: 30px 0; }}
+                .insight-grid {{ display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }}
                 .insight-card {{
                     flex: 1; max-width: 300px; padding: 25px; border-radius: 15px;
                     background: #161b22; border-top: 4px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                 }}
                 .val {{ font-size: 28px; font-weight: bold; color: #00ffff; display: block; margin: 10px 0; }}
-                .radar-container {{
+                .radar-container, .barras-container {{
                     animation: float 4s ease-in-out infinite; background: #161b22;
                     padding: 20px; border-radius: 20px; margin: 20px auto; max-width: 850px; border: 1px solid #30363d;
                 }}
@@ -252,8 +403,8 @@ try:
                 }}
                 .styled-table th {{ background: #00ffff; color: #000; padding: 15px; text-transform: uppercase; font-size: 0.9em; }}
                 .styled-table td {{ padding: 12px; border-bottom: 1px solid #333; }}
-                .row-critical-blink {{ animation: blink-red 2s infinite; font-weight: bold; color: #ff4b4b; }}
-                h1 {{ letter-spacing: 2px; text-transform: uppercase; color: #fff; }}
+                .row-critical-blink {{ animation: blink-red 2s infinite; font-weight: bold; }}
+                h1, h3 {{ letter-spacing: 2px; text-transform: uppercase; color: #fff; }}
             </style>
         </head>
         <body>
@@ -264,7 +415,7 @@ try:
                 <div class="insight-card" style="border-top-color: #ff4b4b;">
                     <small style="color:#ff4b4b">ALERTA: ÁREA CRÍTICA</small>
                     <span class="val">{area_critica}</span>
-                    <small>Puntaje: {score_critico}</small>
+                    <small>Puntaje: {score_critico_area}</small>
                 </div>
                 <div class="insight-card" style="border-top-color: #00ffff;">
                     <small style="color:#00ffff">BENCHMARK: ÁREA LÍDER</small>
@@ -279,24 +430,42 @@ try:
             </div>
 
             <div class="radar-container">
-                <h3>Análisis de Madurez Dinámico e Interactivo</h3>
+                <h3>Análisis de Madurez por Planta (Calificación Global)</h3>
                 {radar_div}
-                <p style="font-size: 0.8em; color: #888;">Pasa el cursor sobre los puntos para ver el detalle por área</p>
+                <p style="font-size: 0.8em; color: #888;">Pasa el cursor sobre los puntos para ver el detalle por planta</p>
+            </div>
+
+            <div class="barras-container">
+                <h3>Calificación Total 5S por Área</h3>
+                {barras_div}
+                <p style="font-size: 0.8em; color: #888;">La barra verde indica el área con mejor desempeño</p>
             </div>
 
             <div style="margin-top:40px;">
-                <h3>📊 Calificaciones Detalladas por Etapa</h3>
+                <h3>📊 Calificaciones Detalladas por Área (Total 5S)</h3>
                 <table class="styled-table" style="max-width: 600px;">
-                    <thead><tr><th>Etapa / S</th><th>Puntaje Promedio</th><th>Área Referente (Líder)</th></tr></thead>
-                    <tbody>{resumen_filas}</tbody>
+                    <thead>
+                        <tr>
+                            <th>Área</th>
+                            <th>Puntaje Promedio Total 5S</th>
+                            <th>Área Referente (Líder)</th>
+                        </tr>
+                    </thead>
+                    <tbody>{tabla_calificaciones_html}</tbody>
                 </table>
             </div>
 
             <div style="margin-top:40px;">
-                <h3>📝 Bitácora de Inspecciones y Puntos Abiertos</h3>
+                <h3>📝 Comentarios de Auditoría por Área</h3>
+                <p style="font-size: 0.8em; color: #ff4b4b;">⚠️ Las filas con parpadeo rojo indican áreas críticas que requieren atención inmediata</p>
                 <table class="styled-table">
-                    <thead><tr><th>Fecha</th><th>Área</th><th>Máquina</th><th>Auditor</th><th>Puntos Abiertos</th></tr></thead>
-                    <tbody>{filas_html}</tbody>
+                    <thead>
+                        <tr>
+                            <th>Área</th>
+                            <th>Comentarios de Auditoría</th>
+                        </tr>
+                    </thead>
+                    <tbody>{comentarios_html if comentarios_html else '<tr><td colspan="2">Sin comentarios registrados</td></tr>'}</tbody>
                 </table>
             </div>
 
@@ -307,7 +476,7 @@ try:
         </html>"""
 
     st.markdown("---")
-    report_html = generate_html_report(resumen, df_filtered)
+    report_html = generate_html_report(resumen, df_filtered, ranking_df)
     st.download_button(label="📥 Descargar Reporte HTML Completo", data=report_html, file_name="reporte_5s_completo.html", mime="text/html", use_container_width=True)
 
     with st.expander("🔍 Ver tabla de datos completa"):
@@ -327,4 +496,3 @@ try:
 
 except Exception as e:
     st.error(f"Error de sistema: {e}")
-
