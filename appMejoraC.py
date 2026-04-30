@@ -53,6 +53,15 @@ try:
         df_calc[col] = df_calc[col].apply(parse_value)
         df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce')
 
+    # --- VALIDAR COLUMNA PLANTA ---
+    if "Planta" not in df_calc.columns:
+        st.warning("⚠️ El dataset no contiene una columna 'Planta'. Se usará el filtro de Área como fallback. Verifica el Google Sheets.")
+        # Creamos una columna Planta ficticia con el valor "General" para no romper funcionalidad
+        df_calc["Planta"] = "General"
+        plantas_disponibles = ["General"]
+    else:
+        plantas_disponibles = sorted(df_calc["Planta"].unique().tolist())
+
     # --- SIDEBAR ---
     logo = "EA_2.png"
     try:
@@ -62,12 +71,32 @@ try:
 
     st.sidebar.markdown("<div style='text-align:center;'><h2>🏭 5S Factory Command Center</h2></div>", unsafe_allow_html=True)
     st.sidebar.header("🔍 Filtros de Auditoría")
-    area_sel = st.sidebar.selectbox("Área", ["Todos"] + sorted(df_raw["Area"].unique().tolist()))
-    maq_sel = st.sidebar.selectbox("Máquina", ["Todos"] + sorted(df_raw["Maquina"].unique().tolist()))
 
-    df_filtered = df_calc.copy()
-    if area_sel != "Todos": df_filtered = df_filtered[df_filtered["Area"] == area_sel]
-    if maq_sel != "Todos": df_filtered = df_filtered[df_filtered["Maquina"] == maq_sel]
+    # NUEVO: Selector de Planta (principal)
+    planta_sel = st.sidebar.selectbox("🌱 Planta", ["Todas"] + plantas_disponibles)
+
+    # --- FILTRADO INICIAL POR PLANTA ---
+    df_plant_filtered = df_calc.copy()
+    if planta_sel != "Todas":
+        df_plant_filtered = df_plant_filtered[df_plant_filtered["Planta"] == planta_sel]
+
+    # Obtener áreas disponibles según la planta seleccionada
+    areas_disponibles = sorted(df_plant_filtered["Area"].unique().tolist())
+    area_sel = st.sidebar.selectbox("Área", ["Todos"] + areas_disponibles)
+
+    # Filtrar por área si aplica
+    df_area_filtered = df_plant_filtered.copy()
+    if area_sel != "Todos":
+        df_area_filtered = df_area_filtered[df_area_filtered["Area"] == area_sel]
+
+    # Obtener máquinas disponibles según área y planta
+    maquinas_disponibles = sorted(df_area_filtered["Maquina"].unique().tolist())
+    maq_sel = st.sidebar.selectbox("Máquina", ["Todos"] + maquinas_disponibles)
+
+    # Aplicar filtro final
+    df_filtered = df_area_filtered.copy()
+    if maq_sel != "Todos":
+        df_filtered = df_filtered[df_filtered["Maquina"] == maq_sel]
 
     # --- CÁLCULOS RESUMEN ---
     resumen_data = []
@@ -89,13 +118,12 @@ try:
     resumen = pd.DataFrame(resumen_data)
 
     # --- NUEVO: Calificaciones por Área (para el gráfico de barras) ---
-    # Calcular el promedio total de las 5S por cada área
     ranking_general = df_filtered.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1).sort_values(ascending=False)
     ranking_df = ranking_general.reset_index()
     ranking_df.columns = ['Area', 'Calificación Total 5S']
 
     # Identificar la barra con mayor calificación
-    max_score = ranking_df['Calificación Total 5S'].max()
+    max_score = ranking_df['Calificación Total 5S'].max() if not ranking_df.empty else 0
     ranking_df['Es_Máximo'] = ranking_df['Calificación Total 5S'] == max_score
 
     st.title("🏭🎛️ 5S Operations Command Center")
