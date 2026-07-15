@@ -4,3 +4,4 @@ numpy
 altair
 plotly
 streamlit-autorefresh
+supabase
