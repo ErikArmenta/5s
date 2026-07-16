@@ -57,7 +57,7 @@ MAPEO_NOMBRES = {
     "s5_2": "5S_Mantener_SHITSUKE [5S_2 Es visible la limpieza, estandarización y orden del área (no hay material mal colocado o suciedad, los documentos estan actualizados, etc.)]"
 }
 
-# --- CARGAR DATOS SIN NECESIDAD DE MAPEOS ---
+# --- CARGAR DATOS CON MAPEO INVERSO ---
 @st.cache_data(ttl=60)
 def load_data(source="Combinar Ambos"):
     df_sheets = pd.DataFrame()
@@ -66,37 +66,38 @@ def load_data(source="Combinar Ambos"):
     # Cargar de Google Sheets
     if source in ["Google Sheets", "Combinar Ambos"]:
         try:
-            sheet_id = "1fQknMt1KB98suoWzOedT87RMC6O_3uuCcUBiv3NOQgo"
-            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+            url = f"https://docs.google.com/spreadsheets/d/1fQknMt1KB98suoWzOedT87RMC6O_3uuCcUBiv3NOQgo/export?format=csv"
             df_sheets = pd.read_csv(url)
             df_sheets.columns = [c.strip() for c in df_sheets.columns]
         except Exception as e:
             st.error(f"Error al cargar Google Sheets: {e}")
 
-    # Cargar de Supabase (Solo auditorías finalizadas)
+    # Cargar de Supabase
     if source in ["Supabase", "Combinar Ambos"]:
         try:
             res = supabase.table("auditorias_5s").select("*").eq("estatus", "terminada").execute()
             if res.data:
                 df_sp_raw = pd.DataFrame(res.data)
-                # Eliminamos las columnas técnicas de la DB para que coincida perfectamente con el CSV
-                cols_to_drop = [c for c in ["id", "creado_en", "actualizado_en", "estatus"] if c in df_sp_raw.columns]
-                df_supabase = df_sp_raw.drop(columns=cols_to_drop)
+                
+                # --- AQUÍ ESTÁ LA MAGIA: Traducimos llaves cortas a nombres largos del CSV ---
+                # Esto hace que el Dashboard crea que vienen del CSV original
+                df_supabase = df_sp_raw.rename(columns={v: k for k, v in MAPEO_NOMBRES.items()})
+                
+                # Eliminamos las columnas técnicas de la DB
+                cols_to_drop = [c for c in ["id", "creado_en", "actualizado_en", "estatus"] if c in df_supabase.columns]
+                df_supabase = df_supabase.drop(columns=cols_to_drop)
         except Exception as e:
-            st.error(f"Error al cargar de Supabase: {e}")
+            st.error(f"Error al conectar con Supabase: {e}")
 
-    # Retornar según la selección
-    if source == "Google Sheets":
-        return df_sheets
-    elif source == "Supabase":
-        return df_supabase
-    else:  # Combinar Ambos
-        if not df_sheets.empty and not df_supabase.empty:
-            return pd.concat([df_sheets, df_supabase], ignore_index=True)
-        elif not df_sheets.empty:
-            return df_sheets
-        else:
-            return df_supabase
+    # Combinar o retornar
+    if source == "Google Sheets": return df_sheets
+    if source == "Supabase": return df_supabase
+    
+    # Si combinamos, nos aseguramos de que las columnas coincidan
+    if not df_sheets.empty and not df_supabase.empty:
+        return pd.concat([df_sheets, df_supabase], ignore_index=True)
+    return df_sheets if not df_sheets.empty else df_supabase
+
 
 # --- SIDEBAR FILTROS ---
 logo = "EA_2.png"
@@ -697,41 +698,41 @@ try:
                     "Seleccione un Turno": turno_form,
                     "Area": area_form,
                     "Maquina": maquina_form,
-
-                    c1s_1: s1_1_form,
-                    c1s_2: s1_2_form,
-                    c1s_3: s1_3_form,
+                    
+                    "s1_1": s1_1_form,
+                    "s1_2": s1_2_form,
+                    "s1_3": s1_3_form,
                     "Comentarios_1S": comentarios_1s_form,
                     "Evidencia_Antes_1S": url_antes_1s,
                     "Evidencia_Despues_1S": url_desp_1s,
-
-                    c2s_1: s2_1_form,
-                    c2s_2: s2_2_form,
-                    c2s_3: s2_3_form,
+                    
+                    "s2_1": s2_1_form,
+                    "s2_2": s2_2_form,
+                    "s2_3": s2_3_form,
                     "Comentario_2S": comentario_2s_form,
                     "Evidencia_Antes_2S": url_antes_2s,
                     "Evidencia_Despues_2S": url_desp_2s,
-
-                    c3s_1: s3_1_form,
-                    c3s_2: s3_2_form,
-                    c3s_3: s3_3_form,
+                    
+                    "s3_1": s3_1_form,
+                    "s3_2": s3_2_form,
+                    "s3_3": s3_3_form,
                     "Comentarios_3S": comentarios_3s_form,
                     "Evidencia_Antes_3S": url_antes_3s,
                     "Evidencia_Despues_3S": url_desp_3s,
-
-                    c4s_1: s4_1_form,
-                    c4s_2: s4_2_form,
-                    c4s_3: s4_3_form,
+                    
+                    "s4_1": s4_1_form,
+                    "s4_2": s4_2_form,
+                    "s4_3": s4_3_form,
                     "Comentarios_4S": comentarios_4s_form,
                     "Evidencia_Antes_4S": url_antes_4s,
                     "Evidencia_Despues_4S": url_desp_4s,
-
-                    c5s_1: s5_1_form,
-                    c5s_2: s5_2_form,
+                    
+                    "s5_1": s5_1_form,
+                    "s5_2": s5_2_form,
                     "Comentarios_5S": comentarios_5s_form,
                     "Evidencia_Antes_5S": url_antes_5s,
                     "Evidencia_Despues_5S": url_desp_5s,
-
+                    
                     "estatus": estatus_accion
                 }
 
