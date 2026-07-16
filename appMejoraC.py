@@ -758,3 +758,6 @@ try:
                     st.error("⚠️ Llena los campos obligatorios antes de finalizar.")
                 else:
                     guardar_auditoria("terminada")
+
+except Exception as e:
+    st.error(f"Error de sistema: {e}")
