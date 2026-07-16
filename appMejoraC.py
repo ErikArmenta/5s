@@ -481,17 +481,16 @@ try:
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
     # ==========================================
-    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (COMPLETO)
+    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CORREGIDO)
     # ==========================================
     with tab_formulario:
         st.subheader("📝 Captura de Auditoría de 5's")
         st.write("Registra o continúa una auditoría de piso.")
 
-        # Función para convertir valor guardado a índice del radio button
+        # --- FUNCIONES AUXILIARES ---
         def get_opcion_idx(valor_campo):
             opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
-            if valor_campo in opciones_s:
-                return opciones_s.index(valor_campo)
+            if valor_campo in opciones_s: return opciones_s.index(valor_campo)
             v_lower = str(valor_campo).lower().strip()
             mapeo_l = {"si cumple": 0, "falta mejorar": 1, "no cumple": 2, "n/a": 3}
             return mapeo_l.get(v_lower, 3)
@@ -500,7 +499,6 @@ try:
             st.session_state.id_borrador_seleccionado = None
 
         tipo_accion = st.radio("Acción:", ["Nueva Auditoría", "Continuar un Borrador guardado"], horizontal=True)
-
         lista_borradores = []
         datos_borrador = {}
 
@@ -509,97 +507,80 @@ try:
                 res_drafts = supabase.table("auditorias_5s").select("*").eq("estatus", "en_proceso").execute()
                 lista_borradores = res_drafts.data if res_drafts.data else []
                 if lista_borradores:
-                    opciones_drafts = {
-                        f"{d.get('Nombre del Auditor', 'Sin auditor')} - {d.get('Area', 'Sin área')} ({d.get('Fecha', '')})": d
-                        for d in lista_borradores
-                    }
-                    seleccion = st.selectbox("Selecciona el borrador para continuar:", list(opciones_drafts.keys()))
+                    opciones_drafts = {f"{d.get('Nombre del Auditor')} - {d.get('Area')}": d for d in lista_borradores}
+                    seleccion = st.selectbox("Selecciona borrador:", list(opciones_drafts.keys()))
                     datos_borrador = opciones_drafts[seleccion]
                     st.session_state.id_borrador_seleccionado = datos_borrador['id']
-                else:
-                    st.info("No se encontraron borradores 'En Proceso'.")
-                    st.session_state.id_borrador_seleccionado = None
-            except Exception as e:
-                st.error(f"Error al conectar con Supabase: {e}")
+            except Exception as e: st.error(f"Error: {e}")
         else:
             st.session_state.id_borrador_seleccionado = None
 
         def get_val(campo, default=""):
-            if tipo_accion == "Continuar un Borrador guardado" and datos_borrador:
-                return datos_borrador.get(campo, default)
-            return default
+            return datos_borrador.get(campo, default) if datos_borrador else default
 
-        # CABECERA GENERAL
-        st.markdown("### 📋 Datos Generales")
+        # --- DATOS GENERALES ---
         col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            planta_def = get_val("Planta", "Juarez FT 1")
-            list_plantas = ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"]
-            planta_idx = list_plantas.index(planta_def) if planta_def in list_plantas else 0
-            planta_form = st.selectbox("Planta", list_plantas, index=planta_idx)
-            
-            try:
-                val_fecha = pd.to_datetime(get_val("Fecha", pd.Timestamp.now().strftime("%Y-%m-%d")))
-            except:
-                val_fecha = pd.Timestamp.now()
-            fecha_form = st.date_input("Fecha", value=val_fecha)
+            planta_form = st.selectbox("Planta", ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"], index=["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"].index(get_val("Planta", "Juarez FT 1")))
+            fecha_form = st.date_input("Fecha", value=pd.to_datetime(get_val("Fecha", pd.Timestamp.now().strftime("%Y-%m-%d"))))
         with col_c2:
             auditor_form = st.text_input("Nombre del Auditor", value=get_val("Nombre del Auditor", ""))
             lider_form = st.text_input("Nombre del Líder de 5s", value=get_val("Nombre del Líder de 5s", ""))
         with col_c3:
-            turno_def = get_val("Seleccione un Turno", "1er Turno")
-            list_turnos = ["1er Turno", "2do Turno", "3er Turno"]
-            turno_idx = list_turnos.index(turno_def) if turno_def in list_turnos else 0
-            turno_form = st.selectbox("Seleccione un Turno", list_turnos, index=turno_idx)
+            turno_form = st.selectbox("Turno", ["1er Turno", "2do Turno", "3er Turno"], index=["1er Turno", "2do Turno", "3er Turno"].index(get_val("Seleccione un Turno", "1er Turno")))
             area_form = st.text_input("Area", value=get_val("Area", ""))
             maquina_form = st.text_input("Maquina", value=get_val("Maquina", ""))
 
-        st.markdown("---")
         st.markdown("### Las 5's Desglosadas")
         opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
 
-        # 1S
+        # --- FORMULARIO 5S ---
+        # Definimos los uploader con valores por defecto para que no fallen al guardado inicial
+        img_antes_1s = img_desp_1s = img_antes_2s = img_desp_2s = img_antes_3s = img_desp_3s = img_antes_4s = img_desp_4s = img_antes_5s = img_desp_5s = None
+
         with st.expander("🧹 1S_Seleccionar_SEIRI", expanded=False):
-            s1_1_form = st.radio("1S_1: Área libre de material dañado/scrap", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key="form_s1_1")
-            s1_2_form = st.radio("1S_2: Máquina libre de material innecesario", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key="form_s1_2")
-            s1_3_form = st.radio("1S_3: Área libre de alimentos/artículos personales", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key="form_s1_3")
+            s1_1_form = st.radio("1S_1", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key="f_s1_1")
+            s1_2_form = st.radio("1S_2", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key="f_s1_2")
+            s1_3_form = st.radio("1S_3", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key="f_s1_3")
             comentarios_1s_form = st.text_area("Comentarios 1S", value=get_val("Comentarios_1S", ""))
-            
-            col_u1a, col_u1d = st.columns(2)
-            with col_u1a: img_antes_1s = st.file_uploader("Evidencia Antes 1S", type=["jpg", "png"], key="f_antes_1s")
-            with col_u1d: img_desp_1s = st.file_uploader("Evidencia Después 1S", type=["jpg", "png"], key="f_desp_1s")
+            col_a, col_d = st.columns(2)
+            with col_a: img_antes_1s = st.file_uploader("Evidencia Antes 1S", type=["jpg", "png"], key="f_a1s")
+            with col_d: img_desp_1s = st.file_uploader("Evidencia Después 1S", type=["jpg", "png"], key="f_d1s")
 
-        # 2S
         with st.expander("📦 2S_Ordenar_SEITON", expanded=False):
-            s2_1_form = st.radio("2S_1: Máquinas etiquetadas y líneas identificadas", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key="form_s2_1")
-            s2_2_form = st.radio("2S_2: Estación de trabajo ordenada", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key="form_s2_2")
-            s2_3_form = st.radio("2S_3: Fixturas con lugar asignado", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key="form_s2_3")
+            s2_1_form = st.radio("2S_1", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key="f_s2_1")
+            s2_2_form = st.radio("2S_2", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key="f_s2_2")
+            s2_3_form = st.radio("2S_3", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key="f_s2_3")
             comentario_2s_form = st.text_area("Comentarios 2S", value=get_val("Comentario_2S", ""))
-            
-            col_u2a, col_u2d = st.columns(2)
-            with col_u2a: img_antes_2s = st.file_uploader("Evidencia Antes 2S", type=["jpg", "png"], key="f_antes_2s")
-            with col_u2d: img_desp_2s = st.file_uploader("Evidencia Después 2S", type=["jpg", "png"], key="f_desp_2s")
+            col_a, col_d = st.columns(2)
+            with col_a: img_antes_2s = st.file_uploader("Evidencia Antes 2S", type=["jpg", "png"], key="f_a2s")
+            with col_d: img_desp_2s = st.file_uploader("Evidencia Después 2S", type=["jpg", "png"], key="f_d2s")
 
-        # 3S
         with st.expander("✨ 3S_Limpieza_SEISO", expanded=False):
-            s3_1_form = st.radio("3S_1: Limpieza inicio/final de turno", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key="form_s3_1")
-            s3_2_form = st.radio("3S_2: Elementos libres de suciedad", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key="form_s3_2")
-            s3_3_form = st.radio("3S_3: Equipos de limpieza disponibles", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key="form_s3_3")
+            s3_1_form = st.radio("3S_1", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key="f_s3_1")
+            s3_2_form = st.radio("3S_2", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key="f_s3_2")
+            s3_3_form = st.radio("3S_3", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key="f_s3_3")
             comentarios_3s_form = st.text_area("Comentarios 3S", value=get_val("Comentarios_3S", ""))
+            col_a, col_d = st.columns(2)
+            with col_a: img_antes_3s = st.file_uploader("Evidencia Antes 3S", type=["jpg", "png"], key="f_a3s")
+            with col_d: img_desp_3s = st.file_uploader("Evidencia Después 3S", type=["jpg", "png"], key="f_d3s")
 
-        # 4S
         with st.expander("📋 4S_Estandarizar_SEIKETSU", expanded=False):
-            s4_1_form = st.radio("4S_1: Tableros y doc. actualizados", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key="form_s4_1")
-            s4_2_form = st.radio("4S_2: Material/racks identificados", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key="form_s4_2")
-            s4_3_form = st.radio("4S_3: Delimitaciones correctas", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key="form_s4_3")
+            s4_1_form = st.radio("4S_1", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key="f_s4_1")
+            s4_2_form = st.radio("4S_2", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key="f_s4_2")
+            s4_3_form = st.radio("4S_3", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key="f_s4_3")
             comentarios_4s_form = st.text_area("Comentarios 4S", value=get_val("Comentarios_4S", ""))
+            col_a, col_d = st.columns(2)
+            with col_a: img_antes_4s = st.file_uploader("Evidencia Antes 4S", type=["jpg", "png"], key="f_a4s")
+            with col_d: img_desp_4s = st.file_uploader("Evidencia Después 4S", type=["jpg", "png"], key="f_d4s")
 
-        # 5S
         with st.expander("🛡️ 5S_Mantener_SHITSUKE", expanded=False):
-            s5_1_form = st.radio("5S_1: Seguimiento por parte del líder", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key="form_s5_1")
-            s5_2_form = st.radio("5S_2: Visibilidad de 5s en el área", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key="form_s5_2")
+            s5_1_form = st.radio("5S_1", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key="f_s5_1")
+            s5_2_form = st.radio("5S_2", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key="f_s5_2")
             comentarios_5s_form = st.text_area("Comentarios 5S", value=get_val("Comentarios_5S", ""))
-
+            col_a, col_d = st.columns(2)
+            with col_a: img_antes_5s = st.file_uploader("Evidencia Antes 5S", type=["jpg", "png"], key="f_a5s")
+            with col_d: img_desp_5s = st.file_uploader("Evidencia Después 5S", type=["jpg", "png"], key="f_d5s")
         
         # GUARDADO FOTOS Y SQL
         def process_image_upload(uploader_file, ref_key):
