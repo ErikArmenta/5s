@@ -480,7 +480,7 @@ try:
                 st.error("Top 5 Áreas por Mejorar")
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
-        # ==========================================
+    # ==========================================
     # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CORREGIDO)
     # ==========================================
     with tab_formulario:
