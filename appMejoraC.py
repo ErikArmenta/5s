@@ -481,11 +481,20 @@ try:
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
     # ==========================================
-    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (EXPANDERS CERRADOS)
+    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (COMPLETO)
     # ==========================================
     with tab_formulario:
         st.subheader("📝 Captura de Auditoría de 5's")
         st.write("Registra o continúa una auditoría de piso.")
+
+        # Función para convertir valor guardado a índice del radio button
+        def get_opcion_idx(valor_campo):
+            opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
+            if valor_campo in opciones_s:
+                return opciones_s.index(valor_campo)
+            v_lower = str(valor_campo).lower().strip()
+            mapeo_l = {"si cumple": 0, "falta mejorar": 1, "no cumple": 2, "n/a": 3}
+            return mapeo_l.get(v_lower, 3)
 
         if "id_borrador_seleccionado" not in st.session_state:
             st.session_state.id_borrador_seleccionado = None
@@ -545,120 +554,53 @@ try:
             area_form = st.text_input("Area", value=get_val("Area", ""))
             maquina_form = st.text_input("Maquina", value=get_val("Maquina", ""))
 
-        opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
-
-        def get_opcion_idx(valor_campo):
-            if valor_campo in opciones_s:
-                return opciones_s.index(valor_campo)
-            v_lower = str(valor_campo).lower().strip()
-            mapeo_l = {"si cumple": 0, "falta mejorar": 1, "no cumple": 2, "n/a": 3}
-            return mapeo_l.get(v_lower, 3)
-
         st.markdown("---")
         st.markdown("### Las 5's Desglosadas")
+        opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
 
-        # 1S_Seleccionar_SEIRI
-        c1s_1 = "1S_Seleccionar_SEIR [1S_1 El área está libre de material dañado, tirado o defectuoso (scrap) y se encuentra en los contenedores para material de scrap o disposición.]"
-        c1s_2 = "1S_Seleccionar_SEIR [1S_2 La máquina o estación está libre de material, herramientas por dentro y fuera.]"
-        c1s_3 = "1S_Seleccionar_SEIR [1S_3 El área de trabajo está libre de alimentos y/o bebidas y artículos personales]"
+        # 1S
         with st.expander("🧹 1S_Seleccionar_SEIRI", expanded=False):
-            st.markdown("**1S_1** El área está libre de material dañado...")
-            s1_1_form = st.radio("Calificación 1S_1", opciones_s, index=get_opcion_idx(get_val(c1s_1, "N/A")), key="form_s1_1")
-            st.markdown("**1S_2** La máquina o estación está libre de material...")
-            s1_2_form = st.radio("Calificación 1S_2", opciones_s, index=get_opcion_idx(get_val(c1s_2, "N/A")), key="form_s1_2")
-            st.markdown("**1S_3** El área de trabajo está libre de alimentos...")
-            s1_3_form = st.radio("Calificación 1S_3", opciones_s, index=get_opcion_idx(get_val(c1s_3, "N/A")), key="form_s1_3")
-            comentarios_1s_form = st.text_area("Comentarios_1S", value=get_val("Comentarios_1S", ""))
-
+            s1_1_form = st.radio("1S_1: Área libre de material dañado/scrap", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key="form_s1_1")
+            s1_2_form = st.radio("1S_2: Máquina libre de material innecesario", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key="form_s1_2")
+            s1_3_form = st.radio("1S_3: Área libre de alimentos/artículos personales", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key="form_s1_3")
+            comentarios_1s_form = st.text_area("Comentarios 1S", value=get_val("Comentarios_1S", ""))
+            
             col_u1a, col_u1d = st.columns(2)
-            with col_u1a:
-                img_antes_1s = st.file_uploader("Evidencia_Antes_1S (Imagen)", type=["jpg", "jpeg", "png"], key="f_antes_1s")
-                if get_val("Evidencia_Antes_1S"): st.image(get_val("Evidencia_Antes_1S"), caption="Evidencia Antes Guardada", width=200)
-            with col_u1d:
-                img_desp_1s = st.file_uploader("Evidencia_Despues_1S (Imagen)", type=["jpg", "jpeg", "png"], key="f_desp_1s")
-                if get_val("Evidencia_Despues_1S"): st.image(get_val("Evidencia_Despues_1S"), caption="Evidencia Después Guardada", width=200)
+            with col_u1a: img_antes_1s = st.file_uploader("Evidencia Antes 1S", type=["jpg", "png"], key="f_antes_1s")
+            with col_u1d: img_desp_1s = st.file_uploader("Evidencia Después 1S", type=["jpg", "png"], key="f_desp_1s")
 
-        # 2S_Ordenar_SEITON
-        c2s_1 = "2S_Ordenar_SEITON [2S_1 Todas las máquinas están etiquetadas (nombre de la estación, número) y todas las líneas de servicio están identificadas de acuerdo al color y con la dirección del flujo. (hidráulico, neumático y eléctrico)]"
-        c2s_2 = "2S_Ordenar_SEITON [2S_2 El personal (operador, coordinador, técnico, supervisor, ingenieros, calidad, etc.) que tiene su área de trabajo en la zona auditada tiene ordenada su estación de trabajo (incluye: máquina, gavetas, mesas, etc.)]"
-        c2s_3 = "2S_Ordenar_SEITON [2S_3 Las fixturas de la máquina tienen un lugar asignado, cerca de la máquina y están ordenadas?]"
+        # 2S
         with st.expander("📦 2S_Ordenar_SEITON", expanded=False):
-            st.markdown("**2S_1** Todas las máquinas están etiquetadas...")
-            s2_1_form = st.radio("Calificación 2S_1", opciones_s, index=get_opcion_idx(get_val(c2s_1, "N/A")), key="form_s2_1")
-            st.markdown("**2S_2** El personal tiene ordenada su estación...")
-            s2_2_form = st.radio("Calificación 2S_2", opciones_s, index=get_opcion_idx(get_val(c2s_2, "N/A")), key="form_s2_2")
-            st.markdown("**2S_3** Las fixturas tienen un lugar asignado...")
-            s2_3_form = st.radio("Calificación 2S_3", opciones_s, index=get_opcion_idx(get_val(c2s_3, "N/A")), key="form_s2_3")
-            comentario_2s_form = st.text_area("Comentario_2S", value=get_val("Comentario_2S", ""))
-
+            s2_1_form = st.radio("2S_1: Máquinas etiquetadas y líneas identificadas", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key="form_s2_1")
+            s2_2_form = st.radio("2S_2: Estación de trabajo ordenada", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key="form_s2_2")
+            s2_3_form = st.radio("2S_3: Fixturas con lugar asignado", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key="form_s2_3")
+            comentario_2s_form = st.text_area("Comentarios 2S", value=get_val("Comentario_2S", ""))
+            
             col_u2a, col_u2d = st.columns(2)
-            with col_u2a:
-                img_antes_2s = st.file_uploader("Evidencia_Antes_2S (Imagen)", type=["jpg", "jpeg", "png"], key="f_antes_2s")
-                if get_val("Evidencia_Antes_2S"): st.image(get_val("Evidencia_Antes_2S"), caption="Evidencia Antes Guardada", width=200)
-            with col_u2d:
-                img_desp_2s = st.file_uploader("Evidencia_Despues_2S (Imagen)", type=["jpg", "jpeg", "png"], key="f_desp_2s")
-                if get_val("Evidencia_Despues_2S"): st.image(get_val("Evidencia_Despues_2S"), caption="Evidencia Después Guardada", width=200)
+            with col_u2a: img_antes_2s = st.file_uploader("Evidencia Antes 2S", type=["jpg", "png"], key="f_antes_2s")
+            with col_u2d: img_desp_2s = st.file_uploader("Evidencia Después 2S", type=["jpg", "png"], key="f_desp_2s")
 
-        # 3S_Limpieza_SEISO
-        c3s_1 = "3S_Limpieza_SEISO [3S_1 El personal limpia su área de trabajo al inicio y final de turno?]"
-        c3s_2 = "3S_Limpieza_SEISO [3S_2 Los elementos del área (máquinas, instrumentos de medición, pruebas destructivas, mesas de trabajo, etc) se encuentran libres de suciedad, basura o polvo]"
-        c3s_3 = "3S_Limpieza_SEISO [3S_3  Los materiales y equipos de limpieza están disponibles, están en buenas condiciones y son fácilmente accesibles.]"
+        # 3S
         with st.expander("✨ 3S_Limpieza_SEISO", expanded=False):
-            st.markdown("**3S_1** ¿El personal limpia su área?")
-            s3_1_form = st.radio("Calificación 3S_1", opciones_s, index=get_opcion_idx(get_val(c3s_1, "N/A")), key="form_s3_1")
-            st.markdown("**3S_2** Los elementos libres de suciedad...")
-            s3_2_form = st.radio("Calificación 3S_2", opciones_s, index=get_opcion_idx(get_val(c3s_2, "N/A")), key="form_s3_2")
-            st.markdown("**3S_3** Equipos de limpieza disponibles...")
-            s3_3_form = st.radio("Calificación 3S_3", opciones_s, index=get_opcion_idx(get_val(c3s_3, "N/A")), key="form_s3_3")
-            comentarios_3s_form = st.text_area("Comentarios_3S", value=get_val("Comentarios_3S", ""))
+            s3_1_form = st.radio("3S_1: Limpieza inicio/final de turno", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key="form_s3_1")
+            s3_2_form = st.radio("3S_2: Elementos libres de suciedad", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key="form_s3_2")
+            s3_3_form = st.radio("3S_3: Equipos de limpieza disponibles", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key="form_s3_3")
+            comentarios_3s_form = st.text_area("Comentarios 3S", value=get_val("Comentarios_3S", ""))
 
-            col_u3a, col_u3d = st.columns(2)
-            with col_u3a:
-                img_antes_3s = st.file_uploader("Evidencia_Antes_3S (Imagen)", type=["jpg", "jpeg", "png"], key="f_antes_3s")
-                if get_val("Evidencia_Antes_3S"): st.image(get_val("Evidencia_Antes_3S"), caption="Evidencia Antes Guardada", width=200)
-            with col_u3d:
-                img_desp_3s = st.file_uploader("Evidencia_Despues_3S (Imagen)", type=["jpg", "jpeg", "png"], key="f_desp_3s")
-                if get_val("Evidencia_Despues_3S"): st.image(get_val("Evidencia_Despues_3S"), caption="Evidencia Después Guardada", width=200)
-
-        # 4S_Estandarizar_SEIKETSU
-        c4s_1 = "4S_Estandarizar_SEIKETSU [4S_1 Los tableros de desempeño por hora y documentación en el área (QPS, ayuda visual, check list, etc.) en el área tienen información actualizada y se encuentran en buenas condiciones (limpios y visibles)]"
-        c4s_2 = "4S_Estandarizar_SEIKETSU [4S_2 El material, sus contenedores y racks estan identificados (cuenta con máximos y minimos)? ¿La etiqueta esta en buenas condiciones?]"
-        c4s_3 = "4S_Estandarizar_SEIKETSU [4S_3 ¿El area se encuentra con las delimitaciones debidas? Carros, pallets, racks, gruas, gavetas.]"
+        # 4S
         with st.expander("📋 4S_Estandarizar_SEIKETSU", expanded=False):
-            st.markdown("**4S_1** Tableros y documentación con información actualizada...")
-            s4_1_form = st.radio("Calificación 4S_1", opciones_s, index=get_opcion_idx(get_val(c4s_1, "N/A")), key="form_s4_1")
-            st.markdown("**4S_2** Material, contenedores y racks identificados...")
-            s4_2_form = st.radio("Calificación 4S_2", opciones_s, index=get_opcion_idx(get_val(c4s_2, "N/A")), key="form_s4_2")
-            st.markdown("**4S_3** El área cuenta con delimitaciones...")
-            s4_3_form = st.radio("Calificación 4S_3", opciones_s, index=get_opcion_idx(get_val(c4s_3, "N/A")), key="form_s4_3")
-            comentarios_4s_form = st.text_area("Comentarios_4S", value=get_val("Comentarios_4S", ""))
+            s4_1_form = st.radio("4S_1: Tableros y doc. actualizados", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key="form_s4_1")
+            s4_2_form = st.radio("4S_2: Material/racks identificados", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key="form_s4_2")
+            s4_3_form = st.radio("4S_3: Delimitaciones correctas", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key="form_s4_3")
+            comentarios_4s_form = st.text_area("Comentarios 4S", value=get_val("Comentarios_4S", ""))
 
-            col_u4a, col_u4d = st.columns(2)
-            with col_u4a:
-                img_antes_4s = st.file_uploader("Evidencia_Antes_4S (Imagen)", type=["jpg", "jpeg", "png"], key="f_antes_4s")
-                if get_val("Evidencia_Antes_4S"): st.image(get_val("Evidencia_Antes_4S"), caption="Evidencia Antes Guardada", width=200)
-            with col_u4d:
-                img_desp_4s = st.file_uploader("Evidencia_Despues_4S (Imagen)", type=["jpg", "jpeg", "png"], key="f_desp_4s")
-                if get_val("Evidencia_Despues_4S"): st.image(get_val("Evidencia_Despues_4S"), caption="Evidencia Después Guardada", width=200)
-
-        # 5S_Mantener_SHITSUKE
-        c5s_1 = "5S_Mantener_SHITSUKE [5S_1 El líder de área (supervisor / coordinador) conoce el resultado de la auditoría 5S y está realizando un seguimiento de las acciones correctivas y los resultados son visibles para todos]"
-        c5s_2 = "5S_Mantener_SHITSUKE [5S_2 Es visible la limpieza, estandarización y orden del área (no hay material mal colocado o suciedad, los documentos estan actualizados, etc.)]"
+        # 5S
         with st.expander("🛡️ 5S_Mantener_SHITSUKE", expanded=False):
-            st.markdown("**5S_1** El líder conoce el resultado y da seguimiento...")
-            s5_1_form = st.radio("Calificación 5S_1", opciones_s, index=get_opcion_idx(get_val(c5s_1, "N/A")), key="form_s5_1")
-            st.markdown("**5S_2** Es visible la limpieza, estandarización...")
-            s5_2_form = st.radio("Calificación 5S_2", opciones_s, index=get_opcion_idx(get_val(c5s_2, "N/A")), key="form_s5_2")
-            comentarios_5s_form = st.text_area("Comentarios_5S", value=get_val("Comentarios_5S", ""))
+            s5_1_form = st.radio("5S_1: Seguimiento por parte del líder", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key="form_s5_1")
+            s5_2_form = st.radio("5S_2: Visibilidad de 5s en el área", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key="form_s5_2")
+            comentarios_5s_form = st.text_area("Comentarios 5S", value=get_val("Comentarios_5S", ""))
 
-            col_u5a, col_u5d = st.columns(2)
-            with col_u5a:
-                img_antes_5s = st.file_uploader("Evidencia_Antes_5S (Imagen)", type=["jpg", "jpeg", "png"], key="f_antes_5s")
-                if get_val("Evidencia_Antes_5S"): st.image(get_val("Evidencia_Antes_5S"), caption="Evidencia Antes Guardada", width=200)
-            with col_u5d:
-                img_desp_5s = st.file_uploader("Evidencia_Despues_5S (Imagen)", type=["jpg", "jpeg", "png"], key="f_desp_5s")
-                if get_val("Evidencia_Despues_5S"): st.image(get_val("Evidencia_Despues_5S"), caption="Evidencia Después Guardada", width=200)
-
+        
         # GUARDADO FOTOS Y SQL
         def process_image_upload(uploader_file, ref_key):
             if uploader_file is not None:
