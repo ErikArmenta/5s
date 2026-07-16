@@ -480,8 +480,8 @@ try:
                 st.error("Top 5 Áreas por Mejorar")
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
-    # ==========================================
-    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CORREGIDO)
+        # ==========================================
+    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CORREGIDO CON KEYS DINÁMICAS)
     # ==========================================
     with tab_formulario:
         st.subheader("📝 Captura de Auditoría de 5's")
@@ -489,18 +489,18 @@ try:
 
         # --- FUNCIONES AUXILIARES MEJORADAS ---
         def get_opcion_idx(valor_campo):
+            """Convierte texto guardado a índice del radio (0-3), sin fallar por mayúsculas/espacios."""
             opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
             if not valor_campo or pd.isna(valor_campo):
                 return 3  # N/A por defecto
             limpio = str(valor_campo).strip()
-            # Comparación insensible a mayúsculas/minúsculas
             for i, opcion in enumerate(opciones_s):
                 if limpio.lower() == opcion.lower():
                     return i
-            # Fallback para variantes
             mapeo_lower = {"si cumple": 0, "falta mejorar": 1, "no cumple": 2, "n/a": 3}
             return mapeo_lower.get(limpio.lower(), 3)
 
+        # Estado para el ID del borrador
         if "id_borrador_seleccionado" not in st.session_state:
             st.session_state.id_borrador_seleccionado = None
 
@@ -518,7 +518,7 @@ try:
                     datos_borrador = opciones_drafts[seleccion]
                     st.session_state.id_borrador_seleccionado = datos_borrador['id']
                 else:
-                    st.info("No hay borradores disponibles. Crea uno nuevo.")
+                    st.info("No hay borradores disponibles.")
             except Exception as e:
                 st.error(f"Error al cargar borradores: {e}")
         else:
@@ -534,126 +534,131 @@ try:
         # --- DATOS GENERALES ---
         col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            plantas_opciones = ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"]
-            idx_planta = plantas_opciones.index(get_val("Planta", "Juarez FT 1")) if get_val("Planta", "Juarez FT 1") in plantas_opciones else 0
-            planta_form = st.selectbox("Planta", plantas_opciones, index=idx_planta)
-            fecha_val = get_val("Fecha", pd.Timestamp.now().strftime("%Y-%m-%d"))
-            try:
-                fecha_form = st.date_input("Fecha", value=pd.to_datetime(fecha_val))
-            except:
-                fecha_form = st.date_input("Fecha", value=pd.Timestamp.now())
+            # Usamos el ID para forzar actualización de selects
+            id_sufijo = st.session_state.id_borrador_seleccionado or "nuevo"
+            planta_form = st.selectbox(
+                "Planta",
+                ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"],
+                index=["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"].index(get_val("Planta", "Juarez FT 1")),
+                key=f"planta_{id_sufijo}"
+            )
+            fecha_form = st.date_input(
+                "Fecha",
+                value=pd.to_datetime(get_val("Fecha", pd.Timestamp.now().strftime("%Y-%m-%d"))),
+                key=f"fecha_{id_sufijo}"
+            )
         with col_c2:
-            auditor_form = st.text_input("Nombre del Auditor", value=get_val("Nombre del Auditor", ""))
-            lider_form = st.text_input("Nombre del Líder de 5s", value=get_val("Nombre del Líder de 5s", ""))
+            auditor_form = st.text_input("Nombre del Auditor", value=get_val("Nombre del Auditor", ""), key=f"auditor_{id_sufijo}")
+            lider_form = st.text_input("Nombre del Líder de 5s", value=get_val("Nombre del Líder de 5s", ""), key=f"lider_{id_sufijo}")
         with col_c3:
-            turnos_opciones = ["1er Turno", "2do Turno", "3er Turno"]
-            idx_turno = turnos_opciones.index(get_val("Seleccione un Turno", "1er Turno")) if get_val("Seleccione un Turno", "1er Turno") in turnos_opciones else 0
-            turno_form = st.selectbox("Turno", turnos_opciones, index=idx_turno)
-            area_form = st.text_input("Area", value=get_val("Area", ""))
-            maquina_form = st.text_input("Maquina", value=get_val("Maquina", ""))
+            turno_form = st.selectbox(
+                "Turno",
+                ["1er Turno", "2do Turno", "3er Turno"],
+                index=["1er Turno", "2do Turno", "3er Turno"].index(get_val("Seleccione un Turno", "1er Turno")),
+                key=f"turno_{id_sufijo}"
+            )
+            area_form = st.text_input("Area", value=get_val("Area", ""), key=f"area_{id_sufijo}")
+            maquina_form = st.text_input("Maquina", value=get_val("Maquina", ""), key=f"maquina_{id_sufijo}")
 
         st.markdown("### Las 5's Desglosadas")
         opciones_s = ["Si cumple", "Falta mejorar", "No cumple", "N/A"]
 
-        # --- FORMULARIO 5S ---
-        # Inicializamos todas las variables de imágenes (se usarán al guardar)
-        img_antes_1s = img_desp_1s = img_antes_2s = img_desp_2s = img_antes_3s = img_desp_3s = img_antes_4s = img_desp_4s = img_antes_5s = img_desp_5s = None
+        # Variables para los file_uploader
+        img_antes_1s = img_desp_1s = img_antes_2s = img_desp_2s = None
+        img_antes_3s = img_desp_3s = img_antes_4s = img_desp_4s = None
+        img_antes_5s = img_desp_5s = None
 
         # --- 1S ---
         with st.expander("🧹 1S_Seleccionar_SEIRI", expanded=False):
-            s1_1_form = st.radio("1S_1", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key="f_s1_1")
-            s1_2_form = st.radio("1S_2", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key="f_s1_2")
-            s1_3_form = st.radio("1S_3", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key="f_s1_3")
-            comentarios_1s_form = st.text_area("Comentarios 1S", value=get_val("Comentarios_1S", ""))
-
+            # Keys dinámicas con el ID del borrador
+            s1_1_form = st.radio("1S_1", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key=f"s1_1_{id_sufijo}")
+            s1_2_form = st.radio("1S_2", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key=f"s1_2_{id_sufijo}")
+            s1_3_form = st.radio("1S_3", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key=f"s1_3_{id_sufijo}")
+            comentarios_1s_form = st.text_area("Comentarios 1S", value=get_val("Comentarios_1S", ""), key=f"com1s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
-                img_antes_1s = st.file_uploader("Evidencia Antes 1S", type=["jpg", "png"], key="f_a1s")
+                img_antes_1s = st.file_uploader("Evidencia Antes 1S", type=["jpg", "png"], key=f"f_a1s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Antes_1S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (antes):")
                     st.image(datos_borrador["Evidencia_Antes_1S"], width=150)
             with col_d:
-                img_desp_1s = st.file_uploader("Evidencia Después 1S", type=["jpg", "png"], key="f_d1s")
+                img_desp_1s = st.file_uploader("Evidencia Después 1S", type=["jpg", "png"], key=f"f_d1s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Despues_1S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_1S"], width=150)
 
         # --- 2S ---
         with st.expander("📦 2S_Ordenar_SEITON", expanded=False):
-            s2_1_form = st.radio("2S_1", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key="f_s2_1")
-            s2_2_form = st.radio("2S_2", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key="f_s2_2")
-            s2_3_form = st.radio("2S_3", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key="f_s2_3")
-            comentario_2s_form = st.text_area("Comentarios 2S", value=get_val("Comentario_2S", ""))
-
+            s2_1_form = st.radio("2S_1", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key=f"s2_1_{id_sufijo}")
+            s2_2_form = st.radio("2S_2", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key=f"s2_2_{id_sufijo}")
+            s2_3_form = st.radio("2S_3", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key=f"s2_3_{id_sufijo}")
+            comentario_2s_form = st.text_area("Comentarios 2S", value=get_val("Comentario_2S", ""), key=f"com2s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
-                img_antes_2s = st.file_uploader("Evidencia Antes 2S", type=["jpg", "png"], key="f_a2s")
+                img_antes_2s = st.file_uploader("Evidencia Antes 2S", type=["jpg", "png"], key=f"f_a2s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Antes_2S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (antes):")
                     st.image(datos_borrador["Evidencia_Antes_2S"], width=150)
             with col_d:
-                img_desp_2s = st.file_uploader("Evidencia Después 2S", type=["jpg", "png"], key="f_d2s")
+                img_desp_2s = st.file_uploader("Evidencia Después 2S", type=["jpg", "png"], key=f"f_d2s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Despues_2S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_2S"], width=150)
 
         # --- 3S ---
         with st.expander("✨ 3S_Limpieza_SEISO", expanded=False):
-            s3_1_form = st.radio("3S_1", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key="f_s3_1")
-            s3_2_form = st.radio("3S_2", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key="f_s3_2")
-            s3_3_form = st.radio("3S_3", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key="f_s3_3")
-            comentarios_3s_form = st.text_area("Comentarios 3S", value=get_val("Comentarios_3S", ""))
-
+            s3_1_form = st.radio("3S_1", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key=f"s3_1_{id_sufijo}")
+            s3_2_form = st.radio("3S_2", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key=f"s3_2_{id_sufijo}")
+            s3_3_form = st.radio("3S_3", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key=f"s3_3_{id_sufijo}")
+            comentarios_3s_form = st.text_area("Comentarios 3S", value=get_val("Comentarios_3S", ""), key=f"com3s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
-                img_antes_3s = st.file_uploader("Evidencia Antes 3S", type=["jpg", "png"], key="f_a3s")
+                img_antes_3s = st.file_uploader("Evidencia Antes 3S", type=["jpg", "png"], key=f"f_a3s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Antes_3S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (antes):")
                     st.image(datos_borrador["Evidencia_Antes_3S"], width=150)
             with col_d:
-                img_desp_3s = st.file_uploader("Evidencia Después 3S", type=["jpg", "png"], key="f_d3s")
+                img_desp_3s = st.file_uploader("Evidencia Después 3S", type=["jpg", "png"], key=f"f_d3s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Despues_3S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_3S"], width=150)
 
         # --- 4S ---
         with st.expander("📋 4S_Estandarizar_SEIKETSU", expanded=False):
-            s4_1_form = st.radio("4S_1", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key="f_s4_1")
-            s4_2_form = st.radio("4S_2", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key="f_s4_2")
-            s4_3_form = st.radio("4S_3", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key="f_s4_3")
-            comentarios_4s_form = st.text_area("Comentarios 4S", value=get_val("Comentarios_4S", ""))
-
+            s4_1_form = st.radio("4S_1", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key=f"s4_1_{id_sufijo}")
+            s4_2_form = st.radio("4S_2", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key=f"s4_2_{id_sufijo}")
+            s4_3_form = st.radio("4S_3", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key=f"s4_3_{id_sufijo}")
+            comentarios_4s_form = st.text_area("Comentarios 4S", value=get_val("Comentarios_4S", ""), key=f"com4s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
-                img_antes_4s = st.file_uploader("Evidencia Antes 4S", type=["jpg", "png"], key="f_a4s")
+                img_antes_4s = st.file_uploader("Evidencia Antes 4S", type=["jpg", "png"], key=f"f_a4s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Antes_4S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (antes):")
                     st.image(datos_borrador["Evidencia_Antes_4S"], width=150)
             with col_d:
-                img_desp_4s = st.file_uploader("Evidencia Después 4S", type=["jpg", "png"], key="f_d4s")
+                img_desp_4s = st.file_uploader("Evidencia Después 4S", type=["jpg", "png"], key=f"f_d4s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Despues_4S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_4S"], width=150)
 
         # --- 5S ---
         with st.expander("🛡️ 5S_Mantener_SHITSUKE", expanded=False):
-            s5_1_form = st.radio("5S_1", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key="f_s5_1")
-            s5_2_form = st.radio("5S_2", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key="f_s5_2")
-            comentarios_5s_form = st.text_area("Comentarios 5S", value=get_val("Comentarios_5S", ""))
-
+            s5_1_form = st.radio("5S_1", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key=f"s5_1_{id_sufijo}")
+            s5_2_form = st.radio("5S_2", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key=f"s5_2_{id_sufijo}")
+            comentarios_5s_form = st.text_area("Comentarios 5S", value=get_val("Comentarios_5S", ""), key=f"com5s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
-                img_antes_5s = st.file_uploader("Evidencia Antes 5S", type=["jpg", "png"], key="f_a5s")
+                img_antes_5s = st.file_uploader("Evidencia Antes 5S", type=["jpg", "png"], key=f"f_a5s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Antes_5S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (antes):")
                     st.image(datos_borrador["Evidencia_Antes_5S"], width=150)
             with col_d:
-                img_desp_5s = st.file_uploader("Evidencia Después 5S", type=["jpg", "png"], key="f_d5s")
+                img_desp_5s = st.file_uploader("Evidencia Después 5S", type=["jpg", "png"], key=f"f_d5s_{id_sufijo}")
                 if datos_borrador and datos_borrador.get("Evidencia_Despues_5S"):
-                    st.caption("📷 Imagen guardada actual:")
+                    st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_5S"], width=150)
 
-        # --- GUARDADO FOTOS Y SQL ---
+        # --- GUARDADO DE FOTOS Y SQL (sin cambios relevantes) ---
         def process_image_upload(uploader_file, ref_key):
             if uploader_file is not None:
                 ext = uploader_file.name.split('.')[-1]
@@ -662,20 +667,18 @@ try:
                 filename = f"evidencia_{ref_key.lower()}_{cleaned_auditor}_{time_stamp}.{ext}"
                 try:
                     supabase.storage.from_("evidencias_5s").upload(
-                        path=filename, file=uploader_file.getvalue(),
+                        path=filename,
+                        file=uploader_file.getvalue(),
                         file_options={"content-type": uploader_file.type, "upsert": "true"}
                     )
                     return supabase.storage.from_("evidencias_5s").get_public_url(filename)
                 except Exception as e:
-                    st.error(f"Error al subir imagen {ref_key}: {e}")
-                    # Si falla, conservamos la URL anterior (si existe)
+                    st.error(f"Error al subir imagen: {e}")
                     return get_val(ref_key, "")
-            # Si no se subió nueva imagen, conservamos la existente
             return get_val(ref_key, "")
 
         def guardar_auditoria(estatus_accion):
             with st.spinner("Subiendo evidencias y guardando en Supabase..."):
-                # Procesar cada imagen, manteniendo las existentes si no se subió nueva
                 url_antes_1s = process_image_upload(img_antes_1s, "Evidencia_Antes_1S")
                 url_desp_1s = process_image_upload(img_desp_1s, "Evidencia_Despues_1S")
                 url_antes_2s = process_image_upload(img_antes_2s, "Evidencia_Antes_2S")
@@ -744,6 +747,7 @@ try:
                 except Exception as db_err:
                     st.error(f"Error al escribir en Supabase: {db_err}")
 
+        # --- BOTONES DE ACCIÓN ---
         st.markdown("### Acciones de Envío")
         col_btn_b, col_btn_f = st.columns(2)
         with col_btn_b:
