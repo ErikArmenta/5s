@@ -39,6 +39,24 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# Este diccionario traduce lo que la DB guarda (s1_1) a lo que tu Dashboard espera (Nombre Largo)
+MAPEO_NOMBRES = {
+    "s1_1": "1S_Seleccionar_SEIR [1S_1 El área está libre de material dañado, tirado o defectuoso (scrap) y se encuentra en los contenedores para material de scrap o disposición.]",
+    "s1_2": "1S_Seleccionar_SEIR [1S_2 La máquina o estación está libre de material, herramientas por dentro y fuera.]",
+    "s1_3": "1S_Seleccionar_SEIR [1S_3 El área de trabajo está libre de alimentos y/o bebidas y artículos personales]",
+    "s2_1": "2S_Ordenar_SEITON [2S_1 Todas las máquinas están etiquetadas (nombre de la estación, número) y todas las líneas de servicio están identificadas de acuerdo al color y con la dirección del flujo. (hidráulico, neumático y eléctrico)]",
+    "s2_2": "2S_Ordenar_SEITON [2S_2 El personal (operador, coordinador, técnico, supervisor, ingenieros, calidad, etc.) que tiene su área de trabajo en la zona auditada tiene ordenada su estación de trabajo (incluye: máquina, gavetas, mesas, etc.)]",
+    "s2_3": "2S_Ordenar_SEITON [2S_3 Las fixturas de la máquina tienen un lugar asignado, cerca de la máquina y están ordenadas?]",
+    "s3_1": "3S_Limpieza_SEISO [3S_1 El personal limpia su área de trabajo al inicio y final de turno?]",
+    "s3_2": "3S_Limpieza_SEISO [3S_2 Los elementos del área (máquinas, instrumentos de medición, pruebas destructivas, mesas de trabajo, etc) se encuentran libres de suciedad, basura o polvo]",
+    "s3_3": "3S_Limpieza_SEISO [3S_3  Los materiales y equipos de limpieza están disponibles, están en buenas condiciones y son fácilmente accesibles.]",
+    "s4_1": "4S_Estandarizar_SEIKETSU [4S_1 Los tableros de desempeño por hora y documentación en el área (QPS, ayuda visual, check list, etc.) en el área tienen información actualizada y se encuentran en buenas condiciones (limpios y visibles)]",
+    "s4_2": "4S_Estandarizar_SEIKETSU [4S_2 El material, sus contenedores y racks estan identificados (cuenta con máximos y minimos)? ¿La etiqueta esta en buenas condiciones?]",
+    "s4_3": "4S_Estandarizar_SEIKETSU [4S_3 ¿El area se encuentra con las delimitaciones debidas? Carros, pallets, racks, gruas, gavetas.]",
+    "s5_1": "5S_Mantener_SHITSUKE [5S_1 El líder de área (supervisor / coordinador) conoce el resultado de la auditoría 5S y está realizando un seguimiento de las acciones correctivas y los resultados son visibles para todos]",
+    "s5_2": "5S_Mantener_SHITSUKE [5S_2 Es visible la limpieza, estandarización y orden del área (no hay material mal colocado o suciedad, los documentos estan actualizados, etc.)]"
+}
+
 # --- CARGAR DATOS SIN NECESIDAD DE MAPEOS ---
 @st.cache_data(ttl=60)
 def load_data(source="Combinar Ambos"):
