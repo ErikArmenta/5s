@@ -206,7 +206,7 @@ try:
     tab_dashboard, tab_formulario = st.tabs(["📊 Dashboard de Control", "📝 Registrar / Continuar Auditoría 5S"])
 
     # ==========================================
-    # PESTAÑA 1: DASHBOARD DE CONTROL (ORIGINAL)
+    # PESTAÑA 1: DASHBOARD DE CONTROL
     # ==========================================
     with tab_dashboard:
         c1, c2, c3 = st.columns(3)
@@ -263,7 +263,9 @@ try:
         )
         st.altair_chart(bars + text, use_container_width=True)
 
-        # REPORTE HTML
+        # ==========================================
+        # REPORTE HTML (RESTAURADO A LA VERSIÓN ORIGINAL)
+        # ==========================================
         def generate_html_report(df_resumen, df_audit, ranking_df_area, mes_aplicado):
             ranking_total = df_audit.groupby('Area')[all_eval_cols].mean(numeric_only=True).mean(axis=1).dropna()
             area_critica = ranking_total.idxmin() if not ranking_total.empty else "N/A"
@@ -285,12 +287,25 @@ try:
                 fig_anim.add_trace(go.Scatterpolar(
                     r=r_v, theta=etapas_ciclo, name=planta,
                     line=dict(color=color_linea, width=3), fill='none',
-                    marker=dict(size=6, color=color_linea)
+                    marker=dict(size=6, color=color_linea),
+                    hovertemplate=f"<b>Planta: {planta}</b><br>Etapa: %{{theta}}<br>Calificación: %{{r}}<br>Promedio: {avg_planta}<extra></extra>"
                 ))
 
+            # Se restauro el estilo en el Update Layout para igualar el original
             fig_anim.update_layout(
-                template="plotly_dark", polar=dict(bgcolor="rgba(0,0,0,0)", radialaxis=dict(range=[0,5], visible=True)),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(t=30, b=30, l=30, r=30)
+                template="plotly_dark",
+                polar=dict(
+                    bgcolor="rgba(0,0,0,0)",
+                    radialaxis=dict(range=[0,5], visible=True, tickfont=dict(color="white", size=12)),
+                    angularaxis=dict(
+                        tickfont=dict(color="white", size=14),
+                        tickvals=etapas_nombres,
+                        ticktext=[f"<b>{etapa}</b>" for etapa in etapas_nombres]
+                    )
+                ),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(t=30, b=30, l=30, r=30)
             )
             radar_div = fig_anim.to_html(full_html=False, include_plotlyjs='cdn')
 
@@ -299,11 +314,14 @@ try:
             fig_barras.add_trace(go.Bar(
                 x=ranking_df_area['Area'], y=ranking_df_area['Calificación Total 5S'],
                 marker_color=['#00FF00' if es_max else '#1f77b4' for es_max in ranking_df_area['Es_Maximo']],
-                text=ranking_df_area['Calificación Total 5S'].round(2), textposition='outside'
+                text=ranking_df_area['Calificación Total 5S'].round(2), textposition='outside',
+                textfont=dict(color='white', size=12), hovertemplate='Área: %{x}<br>Calificación: %{y}<extra></extra>'
             ))
             fig_barras.update_layout(
-                template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(range=[0, 5]), height=500, margin=dict(t=50, b=100, l=50, r=50)
+                title="Calificación Total 5S por Área", template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(title="Calificación Total (0-5)", range=[0, 5], gridcolor="gray", tickfont=dict(color="white")),
+                xaxis=dict(title="Área", tickfont=dict(color="white"), tickangle=-45), height=500, margin=dict(t=50, b=100, l=50, r=50)
             )
             barras_div = fig_barras.to_html(full_html=False, include_plotlyjs='cdn')
 
@@ -314,7 +332,9 @@ try:
                 comentarios = []
                 for col in cols_comentarios:
                     if pd.notna(row[col]) and str(row[col]).strip() != '':
-                        comentarios.append(f"• {col}: {row[col]}")
+                        # Limpiamos el nombre de la columna para que se vea más limpio
+                        col_name = col.replace('Comentario', '').replace('Comentarios', '').replace('_', ' ').strip()
+                        comentarios.append(f"• {col_name}: {row[col]}")
                 if comentarios:
                     if area not in comentarios_por_area: comentarios_por_area[area] = []
                     comentarios_por_area[area].extend(comentarios)
@@ -336,35 +356,90 @@ try:
                 </tr>
                 """
 
+            # HTML RECONSTRUIDO CON CSS AVANZADO ORIGINAL
             return f"""
             <html>
             <head>
                 <meta charset="UTF-8">
                 <style>
-                    @keyframes blink-red {{ 0% {{ background-color: rgba(255, 75, 75, 0.1); }} 50% {{ background-color: rgba(255, 75, 75, 0.4); color: #fff; }} 100% {{ background-color: rgba(255, 75, 75, 0.1); }} }}
+                    @keyframes blink-red {{
+                        0% {{ background-color: rgba(255, 75, 75, 0.1); }}
+                        50% {{ background-color: rgba(255, 75, 75, 0.4); color: #fff; }}
+                        100% {{ background-color: rgba(255, 75, 75, 0.1); }}
+                    }}
+                    @keyframes float {{
+                        0% {{ transform: translateY(0px); }}
+                        50% {{ transform: translateY(-10px); }}
+                        100% {{ transform: translateY(0px); }}
+                    }}
                     body {{ background-color: #0e1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; padding: 40px; text-align: center; }}
-                    .insight-grid {{ display: flex; justify-content: center; gap: 20px; margin: 30px 0; }}
-                    .insight-card {{ flex: 1; max-width: 300px; padding: 25px; border-radius: 15px; background: #161b22; border-top: 4px solid #333; }}
+                    .insight-grid {{ display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }}
+                    .insight-card {{ flex: 1; max-width: 300px; padding: 25px; border-radius: 15px; background: #161b22; border-top: 4px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }}
                     .val {{ font-size: 28px; font-weight: bold; color: #00ffff; display: block; margin: 10px 0; }}
-                    .radar-container, .barras-container {{ background: #161b22; padding: 20px; border-radius: 20px; margin: 20px auto; max-width: 850px; border: 1px solid #30363d; }}
-                    .styled-table {{ width: 90%; margin: auto; border-collapse: collapse; margin-top: 20px; background: #161b22; }}
-                    .styled-table th {{ background: #00ffff; color: #000; padding: 15px; }}
+                    .radar-container, .barras-container {{ animation: float 4s ease-in-out infinite; background: #161b22; padding: 20px; border-radius: 20px; margin: 20px auto; max-width: 850px; border: 1px solid #30363d; }}
+                    .styled-table {{ width: 90%; margin-left: auto; margin-right: auto; border-collapse: collapse; margin-top: 20px; background: #161b22; }}
+                    .styled-table th {{ background: #00ffff; color: #000; padding: 15px; text-transform: uppercase; font-size: 0.9em; }}
                     .styled-table td {{ padding: 12px; border-bottom: 1px solid #333; }}
                     .row-critical-blink {{ animation: blink-red 2s infinite; font-weight: bold; }}
+                    h1, h3 {{ letter-spacing: 2px; text-transform: uppercase; color: #fff; }}
                 </style>
             </head>
             <body>
                 <h1>🏭 Command Center: Reporte de Desempeño 5S</h1>
-                <p>Filtro de Análisis: <b>{mes_aplicado}</b></p>
+                <p style="font-size: 1.2em; color: #00ffff; margin-top: -10px;">Filtro de Análisis: <b>Filtro por Mes -> {mes_aplicado}</b></p>
+                <p>Developed by Master Engineer <b>Erik Armenta</b></p>
+
                 <div class="insight-grid">
-                    <div class="insight-card" style="border-top-color: #ff4b4b;"><small>ÁREA CRÍTICA</small><span class="val">{area_critica}</span><small>Puntaje: {score_critico_area}</small></div>
-                    <div class="insight-card" style="border-top-color: #00ffff;"><small>ÁREA LÍDER</small><span class="val">{area_lider_rep}</span><small>Máximo Desempeño</small></div>
-                    <div class="insight-card" style="border-top-color: #f1c40f;"><small>AUDITOR LÍDER</small><span class="val">{auditor_lider_rep}</span><small>Mayor Actividad</small></div>
+                    <div class="insight-card" style="border-top-color: #ff4b4b;">
+                        <small style="color:#ff4b4b">ALERTA: ÁREA CRÍTICA</small>
+                        <span class="val">{area_critica}</span>
+                        <small>Puntaje: {score_critico_area}</small>
+                    </div>
+                    <div class="insight-card" style="border-top-color: #00ffff;">
+                        <small style="color:#00ffff">BENCHMARK: ÁREA LÍDER</small>
+                        <span class="val">{area_lider_rep}</span>
+                        <small>Máximo Desempeño</small>
+                    </div>
+                    <div class="insight-card" style="border-top-color: #f1c40f;">
+                        <small style="color:#f1c40f">AUDITOR LÍDER</small>
+                        <span class="val">{auditor_lider_rep}</span>
+                        <small>Mayor Nivel de Actividad</small>
+                    </div>
                 </div>
-                <div class="radar-container"><h3>Madurez por Planta</h3>{radar_div}</div>
-                <div class="barras-container"><h3>Calificación por Área</h3>{barras_div}</div>
-                <div><h3>📊 Calificaciones Detalladas</h3><table class="styled-table"><thead><tr><th>Área</th><th>Puntaje</th><th>Referente</th></tr></thead><tbody>{tabla_calificaciones_html}</tbody></table></div>
-                <div><h3>📝 Comentarios</h3><table class="styled-table"><thead><tr><th>Área</th><th>Comentarios</th></tr></thead><tbody>{comentarios_html if comentarios_html else '<tr><td colspan="2">Sin comentarios</td></tr>'}</tbody></table></div>
+
+                <div class="radar-container">
+                    <h3>Análisis de Madurez por Planta (Calificación Global)</h3>
+                    {radar_div}
+                </div>
+
+                <div class="barras-container">
+                    <h3>Calificación Total 5S por Área</h3>
+                    {barras_div}
+                </div>
+
+                <div style="margin-top:40px;">
+                    <h3>📊 Calificaciones Detalladas por Área (Total 5S)</h3>
+                    <table class="styled-table" style="max-width: 600px;">
+                        <thead>
+                            <tr><th>Área</th><th>Puntaje Promedio Total 5S</th><th>Área Referente (Líder)</th></tr>
+                        </thead>
+                        <tbody>{tabla_calificaciones_html}</tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:40px;">
+                    <h3>📝 Comentarios de Auditoría por Área</h3>
+                    <table class="styled-table">
+                        <thead>
+                            <tr><th>Área</th><th>Comentarios de Auditoría</th></tr>
+                        </thead>
+                        <tbody>{comentarios_html if comentarios_html else '<tr><td colspan="2">Sin comentarios registrados</td></tr>'}</tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 50px; color: #888; font-size: 0.9em;">
+                    Generado automáticamente por EA 5S System • {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
+                </div>
             </body>
             </html>"""
 
@@ -387,7 +462,7 @@ try:
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
     # ==========================================
-    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (1-A-1 COINCIDENCIA CON CSV)
+    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (EXPANDERS CERRADOS)
     # ==========================================
     with tab_formulario:
         st.subheader("📝 Captura de Auditoría de 5's")
@@ -426,13 +501,12 @@ try:
                 return datos_borrador.get(campo, default)
             return default
 
-# CABECERA GENERAL
+        # CABECERA GENERAL
         st.markdown("### 📋 Datos Generales")
         col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            # Lógica para la lista desplegable de Planta
             planta_def = get_val("Planta", "Juarez FT 1")
-            list_plantas = ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"] # Modifica o agrega las plantas que necesites aquí
+            list_plantas = ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"]
             planta_idx = list_plantas.index(planta_def) if planta_def in list_plantas else 0
             planta_form = st.selectbox("Planta", list_plantas, index=planta_idx)
             
