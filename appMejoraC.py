@@ -426,11 +426,16 @@ try:
                 return datos_borrador.get(campo, default)
             return default
 
-        # CABECERA GENERAL
+# CABECERA GENERAL
         st.markdown("### 📋 Datos Generales")
         col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            planta_form = st.text_input("Planta", value=get_val("Planta", "Juarez FT 1"))
+            # Lógica para la lista desplegable de Planta
+            planta_def = get_val("Planta", "Juarez FT 1")
+            list_plantas = ["Juarez FT 1", "Juarez HEX 1", "Juarez Santa Fe"] # Modifica o agrega las plantas que necesites aquí
+            planta_idx = list_plantas.index(planta_def) if planta_def in list_plantas else 0
+            planta_form = st.selectbox("Planta", list_plantas, index=planta_idx)
+            
             try:
                 val_fecha = pd.to_datetime(get_val("Fecha", pd.Timestamp.now().strftime("%Y-%m-%d")))
             except:
