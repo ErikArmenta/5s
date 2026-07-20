@@ -480,8 +480,8 @@ try:
                 st.error("Top 5 Áreas por Mejorar")
                 st.table(ranking_resumen.tail(5).sort_values().reset_index().rename(columns={0: 'Puntaje'}))
 
-        # ==========================================
-    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CORREGIDO CON KEYS DINÁMICAS)
+    # ==========================================
+    # PESTAÑA 2: FORMULARIO DE AUDITORÍA (CON PREGUNTAS EN TEXTO PLANO)
     # ==========================================
     with tab_formulario:
         st.subheader("📝 Captura de Auditoría de 5's")
@@ -534,7 +534,6 @@ try:
         # --- DATOS GENERALES ---
         col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            # Usamos el ID para forzar actualización de selects
             id_sufijo = st.session_state.id_borrador_seleccionado or "nuevo"
             planta_form = st.selectbox(
                 "Planta",
@@ -568,12 +567,17 @@ try:
         img_antes_3s = img_desp_3s = img_antes_4s = img_desp_4s = None
         img_antes_5s = img_desp_5s = None
 
-        # --- 1S ---
+        # --- 1S: SEIRI (Seleccionar) ---
         with st.expander("🧹 1S_Seleccionar_SEIRI", expanded=False):
-            # Keys dinámicas con el ID del borrador
+            st.write("**1S_1:** El área está libre de material dañado, tirado o defectuoso (scrap) y se encuentra en los contenedores para material de scrap o disposición.")
             s1_1_form = st.radio("1S_1", opciones_s, index=get_opcion_idx(get_val("s1_1", "N/A")), key=f"s1_1_{id_sufijo}")
+            
+            st.write("**1S_2:** La máquina o estación está libre de material, herramientas por dentro y fuera.")
             s1_2_form = st.radio("1S_2", opciones_s, index=get_opcion_idx(get_val("s1_2", "N/A")), key=f"s1_2_{id_sufijo}")
+            
+            st.write("**1S_3:** ¿El área de trabajo está libre de alimentos y/o bebidas y artículos personales?  Nota: Se permite una botella de agua con tapa de rosca.")
             s1_3_form = st.radio("1S_3", opciones_s, index=get_opcion_idx(get_val("s1_3", "N/A")), key=f"s1_3_{id_sufijo}")
+            
             comentarios_1s_form = st.text_area("Comentarios 1S", value=get_val("Comentarios_1S", ""), key=f"com1s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
@@ -587,11 +591,17 @@ try:
                     st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_1S"], width=150)
 
-        # --- 2S ---
+        # --- 2S: SEITON (Ordenar) ---
         with st.expander("📦 2S_Ordenar_SEITON", expanded=False):
+            st.write("**2S_1:** Todas las máquinas están etiquetadas (nombre de la estación, número) y todas las líneas de servicio están identificadas de acuerdo al color y con la dirección del flujo. (hidráulico, neumático y eléctrico)")
             s2_1_form = st.radio("2S_1", opciones_s, index=get_opcion_idx(get_val("s2_1", "N/A")), key=f"s2_1_{id_sufijo}")
+            
+            st.write("**2S_2:** El personal (operador, coordinador, técnico, supervisor, ingenieros, calidad, etc.) que tiene su área de trabajo en la zona auditada tiene ordenada su estación de trabajo (incluye: máquina, gavetas, mesas, etc.)")
             s2_2_form = st.radio("2S_2", opciones_s, index=get_opcion_idx(get_val("s2_2", "N/A")), key=f"s2_2_{id_sufijo}")
+            
+            st.write("**2S_3:** Las fixturas de la máquina tienen un lugar asignado, cerca de la máquina y están ordenadas?")
             s2_3_form = st.radio("2S_3", opciones_s, index=get_opcion_idx(get_val("s2_3", "N/A")), key=f"s2_3_{id_sufijo}")
+            
             comentario_2s_form = st.text_area("Comentarios 2S", value=get_val("Comentario_2S", ""), key=f"com2s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
@@ -605,11 +615,17 @@ try:
                     st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_2S"], width=150)
 
-        # --- 3S ---
+        # --- 3S: SEISO (Limpieza) ---
         with st.expander("✨ 3S_Limpieza_SEISO", expanded=False):
+            st.write("**3S_1:** El personal limpia su área de trabajo al inicio y final de turno?")
             s3_1_form = st.radio("3S_1", opciones_s, index=get_opcion_idx(get_val("s3_1", "N/A")), key=f"s3_1_{id_sufijo}")
+            
+            st.write("**3S_2:** Los elementos del área (máquinas, instrumentos de medición, pruebas destructivas, mesas de trabajo, etc) se encuentran libres de suciedad, basura o polvo")
             s3_2_form = st.radio("3S_2", opciones_s, index=get_opcion_idx(get_val("s3_2", "N/A")), key=f"s3_2_{id_sufijo}")
+            
+            st.write("**3S_3:** Los materiales y equipos de limpieza están disponibles, están en buenas condiciones y son fácilmente accesibles.")
             s3_3_form = st.radio("3S_3", opciones_s, index=get_opcion_idx(get_val("s3_3", "N/A")), key=f"s3_3_{id_sufijo}")
+            
             comentarios_3s_form = st.text_area("Comentarios 3S", value=get_val("Comentarios_3S", ""), key=f"com3s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
@@ -623,11 +639,17 @@ try:
                     st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_3S"], width=150)
 
-        # --- 4S ---
+        # --- 4S: SEIKETSU (Estandarizar) ---
         with st.expander("📋 4S_Estandarizar_SEIKETSU", expanded=False):
+            st.write("**4S_1:** Los tableros de desempeño por hora y documentación en el área (QPS, ayuda visual, check list, etc.) en el área tienen información actualizada y se encuentran en buenas condiciones (limpios y visibles)")
             s4_1_form = st.radio("4S_1", opciones_s, index=get_opcion_idx(get_val("s4_1", "N/A")), key=f"s4_1_{id_sufijo}")
+            
+            st.write("**4S_2:** ¿El material, sus contenedores y racks estan identificados (cuenta con máximos y minimos)? ¿La etiqueta esta en buenas condiciones?")
             s4_2_form = st.radio("4S_2", opciones_s, index=get_opcion_idx(get_val("s4_2", "N/A")), key=f"s4_2_{id_sufijo}")
+            
+            st.write("**4S_3:** ¿El area se encuentra con las delimitaciones debidas? Carros, pallets, racks, gruas, gavetas.")
             s4_3_form = st.radio("4S_3", opciones_s, index=get_opcion_idx(get_val("s4_3", "N/A")), key=f"s4_3_{id_sufijo}")
+            
             comentarios_4s_form = st.text_area("Comentarios 4S", value=get_val("Comentarios_4S", ""), key=f"com4s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
@@ -641,10 +663,14 @@ try:
                     st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_4S"], width=150)
 
-        # --- 5S ---
+        # --- 5S: SHITSUKE (Mantener) ---
         with st.expander("🛡️ 5S_Mantener_SHITSUKE", expanded=False):
+            st.write("**5S_1:** El líder de área (supervisor / coordinador) conoce el resultado de la auditoría 5S y está realizando un seguimiento de las acciones correctivas y los resultados son visibles para todos")
             s5_1_form = st.radio("5S_1", opciones_s, index=get_opcion_idx(get_val("s5_1", "N/A")), key=f"s5_1_{id_sufijo}")
+            
+            st.write("**5S_2:** Es visible la limpieza, estandarización y orden del área (no hay material mal colocado o suciedad, los documentos estan actualizados, etc.) Revise pisos, paredes, escaleras, etc.")
             s5_2_form = st.radio("5S_2", opciones_s, index=get_opcion_idx(get_val("s5_2", "N/A")), key=f"s5_2_{id_sufijo}")
+            
             comentarios_5s_form = st.text_area("Comentarios 5S", value=get_val("Comentarios_5S", ""), key=f"com5s_{id_sufijo}")
             col_a, col_d = st.columns(2)
             with col_a:
@@ -658,7 +684,7 @@ try:
                     st.caption("📷 Imagen guardada (después):")
                     st.image(datos_borrador["Evidencia_Despues_5S"], width=150)
 
-        # --- GUARDADO DE FOTOS Y SQL (sin cambios relevantes) ---
+        # --- GUARDADO DE FOTOS Y SQL ---
         def process_image_upload(uploader_file, ref_key):
             if uploader_file is not None:
                 ext = uploader_file.name.split('.')[-1]
